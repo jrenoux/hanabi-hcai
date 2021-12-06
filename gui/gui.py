@@ -15,6 +15,10 @@
 """Example code demonstrating the Python Hanabi interface."""
 
 from __future__ import print_function
+from os import remove
+from typing import Text
+
+from asyncio.runners import run
 
 from hanabi_learning_environment import pyhanabi
 from game_components import *
@@ -29,13 +33,16 @@ import justpy as jp
 label_classes = 'block uppercase text-gray-500 text-xs font-bold'
 selectlist_classes = 'w-32 text-xl text-blue-500 text-center font-bold bg-gray-900 border border-blue-500 rounded'
 button_classes = 'text-blue-500 font-bold uppercase border border-blue-500 rounded w-48 p-3 ml-2'
+human_button_classes = 'text-blue-500 font-bold uppercase border border-blue-500 rounded max-w-48 p-3 ml-2'
 
+#added card colors dict to be able to match in human controlls
+card_colors_dict = { 'R' : 'red', 'Y' : 'yellow', 'G' : 'green', 'W' : 'white', 'B' : 'blue' }
 card_colors = [ 'red', 'yellow', 'green', 'white', 'blue' ] 
-table_positions= {  1: [(1,3)], 
-                    2: [(2,5), (2,1)], 
-                    3: [(1,3), (2,5), (2,1)], 
-                    4: [(2,5), (6,5), (6,1), (2,1)], 
-                    5: [(1,3), (2,5), (6,5), (6,1), (2,1)]}
+table_positions= {  1: [(2,3)], 
+                    2: [(3,5), (3,1)], 
+                    3: [(3,3), (3,5), (3,1)], 
+                    4: [(3,5), (7,5), (7,1), (3,1)], 
+                    5: [(2,3), (3,5), (7,5), (7,1), (3,1)]}
 threads = []
 sessions = {}
 
@@ -195,29 +202,32 @@ class Menu(jp.Div):
                        name = 'num_players',
                        disabled = self.session['is_running'], 
                        a = menu_container)
-        SelectListItem(label_text = 'Step frequency', 
-                       options = range(0,11),
-                       cast_type = int,
-                       session = self.session,
-                       session_variable = 'step_frequency', 
-                       name = 'step_frequency',
-                       a = menu_container)
-
-        radio_container = jp.Div(classes = 'flex flex-col p-2', name = 'radio_container', a = menu_container)
-        RadioItem(label_text = 'Observer view', 
-                  item_value = 'observer',
-                  cast_type = str,
-                  session = self.session,
-                  session_variable = 'view',
-                  name = 'observer_view', 
-                  a = radio_container)
-        RadioItem(label_text = 'Agent view', 
-                  cast_type = str,
-                  item_value = 'agent',
-                  session = self.session,
-                  session_variable = 'view',
-                  name = 'agent_view', 
-                  a = radio_container)        
+        #the step frequency and view-select only shows if the view isn't human_player
+        print('session', self.session['view'])
+        if self.session['view'] != 'human_player':
+            SelectListItem(label_text = 'Step frequency', 
+                        options = range(0,11),
+                        cast_type = int,
+                        session = self.session,
+                        session_variable = 'step_frequency', 
+                        name = 'step_frequency',
+                        a = menu_container)
+        if self.session['view'] != 'human_player':
+            radio_container = jp.Div(classes = 'flex flex-col p-2', name = 'radio_container', a = menu_container)
+            RadioItem(label_text = 'Observer view', 
+                    item_value = 'observer',
+                    cast_type = str,
+                    session = self.session,
+                    session_variable = 'view',
+                    name = 'observer_view', 
+                    a = radio_container)
+            RadioItem(label_text = 'Agent view', 
+                    cast_type = str,
+                    item_value = 'agent',
+                    session = self.session,
+                    session_variable = 'view',
+                    name = 'agent_view', 
+                    a = radio_container)
 
         button_container = jp.Div(classes = 'flex', name = 'button_container', a = menu_container)
         button_visibility = 'visible' if self.session['is_running'] else 'invisible'
@@ -303,8 +313,12 @@ class Log(jp.Div):
                 self.end_text = f'to player {self.revealed_player + 1}' 
             elif self.item.move().type() == 5:
                 self.lead_text = f'Dealt'
-                self.card_color = card_colors[self.item.move().color()] if (self.session['view'] == 'observer' or self.log_type == 'states_log') else 'gray'
-                self.card_text = f'{self.card_color} {self.item.move().rank() + 1}' if (self.session['view'] == 'observer' or self.log_type == 'states_log') else 'unknown card'
+                '''The following lines below will show the color 
+                   and rank if the player is NOT marked in agent-play 
+                   or NOT the human-player in human-play
+                '''
+                self.card_color = 'gray' if (self.session['current_player'] == self.dealt_player and self.session['view'] == 'human_player' or self.session['view'] == 'agent') else card_colors[self.item.move().color()]
+                self.card_text = 'unknown card' if (self.session['current_player'] == self.dealt_player and self.session['view'] == 'human_player' or self.session['view'] == 'agent') else f'{self.card_color} {self.item.move().rank() + 1}'
                 self.end_text = f'to player {self.dealt_player + 1}'
             else:
                 self.log_title = 'No such log item.'
@@ -377,7 +391,7 @@ class LegalMoves(jp.Div):
             self.current_player = self.session['current_player']
             self.num_players = self.session['num_players']
 
-            container = jp.Div(name = 'container', a = self)
+            container = jp.Div(name = str(self.move), a = self)
             self.revealed_player = (self.current_player + self.move.target_offset()) % self.num_players
 
             if self.move.type() == 1:
@@ -409,6 +423,131 @@ class LegalMoves(jp.Div):
             jp.Span(classes = f'mr-1 mb-1 text-{color}', text = f'{self.card_text}', name = 'card_text_span', a = container)
             jp.Span(classes = 'mr-1 mb-1', text = f'{self.end_text}', name = 'end_text_span', a = container)
 
+class HumanControls(jp.Div):
+    def __init__(self, **kwargs):
+        self.legal_moves = []
+        self.session = None
+        super().__init__(**kwargs)
+        '''
+        #changes the button value to the value of the droplist in order to send the right move with make move function
+        def changeMove (self, event):
+            makeMoveButton.value = move_select.value'''
+            
+        def revealTo(self, event):
+            #for each player create a button, when button/player selected get the legal reveals(in other function)
+
+            #hides play/discard buttons if they exist
+            if play_discard_button.show == True:
+                play_discard_button.show = False
+
+            print('Reveal to')
+            player_reveal_buttons.show = True
+            
+            
+                    
+            #revealMovesButton = jp.Div(classes = 'grid grid-flow-col items-center text-center h-24', show = False, a = control_container)
+            #for i in 
+
+            
+                
+
+        control_container = jp.Div(classes = 'flex flex-row items-center text-center h-24', name = 'control_container', a = self)
+        
+        #reveal button to later select player, rank/color to reveal
+        jp.Button(classes = human_button_classes,
+                        text = 'Reveal',
+                        click = revealTo,
+                        name = 'revealTo',
+                        a = control_container)
+        
+        player_reveal_buttons = jp.Div(classes = 'grid grid-rows-2 auto-cols-auto items-center text-center h-24',
+                        show = False,
+                        name = 'player_reveal_buttons',
+                        a = control_container)
+        player_buttons = jp.Div(classes = 'flex flex-row items-center text-center h-12',
+                        name = 'player_buttons',
+                        a = player_reveal_buttons)
+        for player in range(self.session['num_players'] - 1):
+            jp.Button(classes = human_button_classes,
+                        text = f'Player {player + 2}',
+                        value = f'player +{player + 1}',
+                        name = f'player +{player + 1}',
+                        click = self.legalReveals,
+                        a = player_buttons)
+
+
+        #two buttons, play and discard, for when a card is clicked to decide what to do with the card
+        play_discard_button = jp.Div(classes = 'grid grid-flow-col items-center text-center h-24', name = 'play_discard_button', show = False, a = control_container)
+        cardClicked = self.session['human_player']['card_clicked']
+        jp.Button(classes = human_button_classes,
+                text = 'Play',
+                name = f'(Play {cardClicked})',
+                click = self.makeMove_playDiscard,
+                a = play_discard_button)
+        jp.Button(classes = human_button_classes,
+                text = 'Discard',
+                name = f'(Discard {cardClicked})',
+                click = self.makeMove_playDiscard,
+                a = play_discard_button)
+
+        if self.session['human_player']['card_clicked'] != '':
+            play_discard_button.show = True
+
+    def legalReveals(self, event):
+            print(f'Self: {self}')
+            print(f'Event: {event}')
+            print(f'CC components: {self.get_components()[0].get_components()}')
+            for comp in self.get_components()[0].get_components():
+                if str(comp.name) == 'player_reveal_buttons':                    
+                    #removes other players reveal-options if they exist
+                    if comp.get_components()[-1].name == 'legal_reveals':
+                        comp.remove_component(comp.get_components()[-1])
+                        
+         
+                    div_ = jp.Div(classes = 'flex flex-row items-center text-center h-14', name = 'legal_reveals', a = comp)
+                    break
+            print('Event target value: ', event['target'].value)
+            print('Legal moves', self.legal_moves)
+            for legalMove in self.legal_moves:
+                if 'Reveal' in str(legalMove):
+                    print('Reveal in the legal move')
+                    if str(event['target'].value) in str(legalMove):
+                        print('event-value in the legal move')
+                        if 'color' in str(legalMove):
+                            print('color in the legal move')
+                            for letter, color in card_colors_dict.items():
+                                if letter == str(legalMove)[-2]:
+                                    jp.Button(classes = f'{human_button_classes} bg-{color}', text = f'Reveal {color}', value = str(legalMove), click = self.makeMove_reveal, a = div_)
+                                    print(legalMove)
+                                    break
+                        elif 'rank' in str(legalMove):
+                            print('rank in the legal move')
+                            jp.Button(classes = human_button_classes, text = f'Reveal {str(legalMove)[-2]}',value = str(legalMove), click = self.makeMove_reveal, a = div_)
+                            print(legalMove)
+            print('legalReveals Done!')
+
+    def makeMove_playDiscard(self, event):
+        try:
+            print('self: ', self)
+            print('Message: ', event)
+            event_logger(self.session, 'make move')
+            self.session['human_player']['human_moves'].insert(0, event['target'].name)
+            self.session['human_player']['move_made'] = not self.session['human_player']['move_made']
+            self.session['human_player']['card_clicked'] = ''
+        except Exception as err:
+            print('The make move function has crashed or timed/locked out. Try again.')
+            print('Exception: {}'.format(err))
+    
+    def makeMove_reveal(self, event):
+        try:
+            print('Message: ', event)
+            event_logger(self.session, 'make move')
+            self.session['human_player']['human_moves'].insert(0, event['value'])
+            self.session['human_player']['move_made'] = not self.session['human_player']['move_made']
+        except Exception as err:
+            print('The make move function has crashed or timed/locked out. Try again.')
+            print('Exception: {}'.format(err))
+            
 class Player(jp.Div):
     """Player component.
 
@@ -432,8 +571,11 @@ class Player(jp.Div):
     
         container = jp.Div(classes = 'flex flex-col items-center text-center h-24', name = 'container', a = self)
 
-        player_label = jp.Button(classes = f'{label_classes} mb-2', click = self.update_page, text = f'Player {self.id + 1}', name = 'player_label', a = container)
+        player_label = jp.Button(classes = f'{label_classes} mb-2', text = f'Player {self.id + 1}', name = 'player_label', a = container)
         player_label.set_classes('text-yellow-400') if self.current_player == self.id else None
+        #if view is human player the player should not be able to change player view
+        if self.view != 'human_player':
+            player_label.on('click', self.differentPlayerView)
 
         card_container = jp.Div(classes = 'flex flex-row items-center', name = 'card_container', a = container)
 
@@ -452,31 +594,67 @@ class Player(jp.Div):
                     Card(rank = '?' if card_knowledge_rank == None else card_knowledge_rank + 1, 
                          color = 'gray' if card_knowledge_color == None else card_colors[card_knowledge_color], 
                          a = card_container)
+                elif self.view == 'human_player':
+                    '''Adds the clicking function to the card of the human-player
+                    '''
+                    
+                    card_knowledge_rank, card_knowledge_color = None, None
+                    if len(self.card_knowledge) > 0:
+                        card_knowledge_rank = self.card_knowledge[self.card_index].rank() 
+                        card_knowledge_color = self.card_knowledge[self.card_index].color()
+
+                    card = Card(rank = '?' if card_knowledge_rank == None else card_knowledge_rank + 1, 
+                        color = 'gray' if card_knowledge_color == None else card_colors[card_knowledge_color], 
+                        name = f'{self.card_index}',
+                        a = card_container)
+                    if self.current_player == 0:
+                        card.on('click', self.clickCard)
                 else:
                     Card(rank = card.rank()+1, color = card_colors[card.color()], a = card_container)
             else:
                 Card(rank = card.rank()+1, color = card_colors[card.color()], a = card_container)
             self.card_index += 1
-
-    async def update_page(self, event):
-            """Update the GUI based on the current player.
-
-            Args: state: state of the game.
-                    session_id: string, ID of the current session.
-                    page: WebPage, the webpage to be updated.
-            """
-            try:
+    '''Separated the function that changes the player view from the 
+        update page function to be able to use it in click card function as well
+    '''
+    async def clickCard(self, event):
+        #gets the name from the button which is the color and rank but not visible to the player in the GUI
+        try: 
+            print(event)
+            print('Card : ', event['target'].name)
+            event_logger(self.session, 'clicked card')
+            self.session['human_player']['card_clicked'] = event['target'].name
+            await self.update_page(event)
+        except Exception as err:
+            print('The click card function has crashed or timed/locked out. Try again.')
+            print('Exception: {}'.format(err))
+    
+    async def differentPlayerView(self, event):
+        try:
                 event_logger(self.session, 'a different player view')
                 self.session['is_paused'] = True
-                event.page.delete_components()
-                latest_state = self.session['states'][0]
-                view_state = self.state
                 self.session['current_player'] = self.id
-                MainPage(name = 'main_page', session = self.session, state = latest_state, view_state = view_state, a = event.page)
-                await event.page.update()
-            except Exception as err:
-                print('The main page failed to update from Log.')
-                print(err)
+                await self.update_page(event)
+        except Exception as err:
+            print('The diffrent player view function has crashed or timed/locked out.')
+            print(err)
+
+    async def update_page(self, event):
+        """Update the GUI based on the current player.
+
+        Args: state: state of the game.
+                session_id: string, ID of the current session.
+                page: WebPage, the webpage to be updated.
+        """
+        try:
+            event.page.delete_components()
+            latest_state = self.session['states'][0]
+            view_state = self.state
+            MainPage(name = 'main_page', session = self.session, state = latest_state, view_state = view_state, a = event.page)
+            await event.page.update()
+        except Exception as err:
+            print('The main page failed to update from Log.')
+            print(err)
 
 class ObserverViewBoard(jp.Div):
     """Game board class containing the game components.
@@ -515,7 +693,7 @@ class ObserverViewBoard(jp.Div):
             self.info_tokens = self.state.information_tokens()
             self.life_tokens = self.state.life_tokens()
 
-            game_grid = jp.Div(classes = 'grid grid-cols-5 grid-rows-5', name = 'game_grid', a = self)
+            game_grid = jp.Div(classes = 'grid grid-cols-5 grid-rows-6', name = 'game_grid', a = self)
 
             for player_index, player_hand in enumerate(self.player_hands):
                 player_position = table_positions[self.num_players]
@@ -526,15 +704,108 @@ class ObserverViewBoard(jp.Div):
                 Player(classes = f'row-start-{row} col-start-{col}', state = self.state, session = self.session, hand = player_hand, current_player = self.current_player, view = self.session['view'], id = player_id, a = game_grid)
                 self.index += 1
 
-            GameUtilities(classes = 'row-start-3 col-start-3', 
+            GameUtilities(classes = 'row-start-4 col-start-3', 
                         deck_size = self.deck_size, 
                         info_tokens = self.info_tokens, 
                         life_tokens = self.life_tokens,
                         name = 'game_utilities', 
                         a = game_grid)
 
-            PlayedCards(classes = 'row-start-4 col-start-2', label_text = 'Played Cards', cards = self.played_cards, name = 'played_cards', a = game_grid)
-            DiscardedCards(classes = 'row-start-4 col-start-4', label_text = 'Discarded Cards', cards = self.discarded_cards, name = 'discarded_cards', a = game_grid)
+            PlayedCards(classes = 'row-start-5 col-start-2', label_text = 'Played Cards', cards = self.played_cards, name = 'played_cards', a = game_grid)
+            DiscardedCards(classes = 'row-start-5 col-start-4', label_text = 'Discarded Cards', cards = self.discarded_cards, name = 'discarded_cards', a = game_grid)
+#Added by olof
+class HumanPlayerViewBoard(jp.Div):
+    def __init__(self, **kwargs):
+        self.state = None
+        self.observation = None
+        self.session = None
+        self.current_player = -1
+        self.num_players = 0
+        self.card_knowledge = []
+        self.observed_hands = []
+        self.played_cards = []
+        self.discarded_cards = []
+        self.deck_size = 0
+        self.info_tokens = 0
+        self.life_tokens = 0
+        self.latest_moves = []
+        self.legal_moves = []
+        super().__init__(**kwargs)
+
+        if self.state:
+            if self.current_player >= 0:
+                self.observation = self.state.observation(self.current_player)
+                self.card_knowledge = self.sort_cards(self.observation.card_knowledge(), self.observation.num_players())
+                self.observed_hands = self.sort_cards(self.observation.observed_hands(), self.observation.num_players())
+                self.played_cards = self.observation.fireworks()
+                self.discarded_cards = self.observation.discard_pile()
+                self.deck_size = self.observation.deck_size()
+                self.info_tokens = self.observation.information_tokens()
+                self.life_tokens = self.observation.life_tokens()
+                self.latest_moves = self.observation.last_moves()
+                self.legal_moves = self.observation.legal_moves()
+                self.index = 0
+
+            container = jp.Div(classes = f'{label_classes} flex flex-col', text = f'Player {self.current_player + 1} observations', name = 'container', a = self)
+            game_grid = jp.Div(classes = 'grid grid-cols-5 grid-rows-6', name = 'game_grid', a = container)
+            if self.state.cur_player() == 0:
+                HumanControls(classes = 'row-start-0 col-start-0 col-span-5',
+                            legal_moves = self.legal_moves,
+                            session = self.session,
+                            a = game_grid)
+            else:
+                jp.Label(text = 'Wait for your turn...', a = game_grid)
+
+            for player_index, player_hand in enumerate(self.observed_hands):
+                player_id = player_index
+                player_position = table_positions[self.num_players]
+                row = player_position[self.index][0]
+                col = player_position[self.index][1]
+                knowledge = self.card_knowledge[player_id]
+
+                Player(classes = f'row-start-{row} col-start-{col}', session = self.session, state = self.state, view = self.session['view'], hand = player_hand, card_knowledge = knowledge, id = player_id, current_player = self.current_player, a = game_grid)
+                self.index += 1
+
+            GameUtilities(classes = 'row-start-3 col-start-3', 
+                          deck_size = self.deck_size, 
+                          info_tokens = self.info_tokens, 
+                          life_tokens = self.life_tokens,
+                          name = 'game_utilities', 
+                          a = game_grid)
+            PlayedCards(classes = 'row-start-5 col-start-2', title = 'Played Cards', cards = self.played_cards, name = 'played_cards', a = game_grid)
+            DiscardedCards(classes = 'row-start-5 col-start-4', title = 'Discarded Cards', cards = self.discarded_cards, name = 'discarded_card', a = game_grid)
+
+            bottom_container = jp.Div(classes = 'flex justify-between border-t border-blue-500 m-10 p-5', name = 'bottom_container', a = container)
+            LegalMoves(label_text = 'Legal Moves', moves = self.legal_moves, session = self.session, name = 'legal_moves', a = bottom_container)
+            
+            Log(classes = 'h-60 overflow-scroll', 
+                label_text = 'Latest moves since this player\'s action',
+                log_type = 'latest_moves_log',
+                log_items = self.latest_moves,
+                session = self.session,
+                num_players = self.session['num_players'],
+                current_player = self.current_player,
+                name = 'latest_moves_log',
+                a = bottom_container)
+    def sort_cards(self, cards, num_players):
+        """Sorts the cards in actual player order instead of the offset from the current observer
+            
+            Args: cards: list, List of cards to be sorted.
+                    num_players: int, Number of players in the game.
+
+            Returns: sorted_cards: list, List of sorted cards.
+        """
+        try:
+            sorted_cards = []
+            for i in range(0, num_players):
+                player_index = (self.current_player + i) % num_players
+                sorted_cards.insert(player_index, cards[i])
+            return sorted_cards
+        except Exception as err:
+            print('Cards could not be sorted.')
+            print('Exception: {}'.format(err))
+
+#Added by olof/
 
 class AgentViewBoard(jp.Div):
     def __init__(self, **kwargs):
@@ -634,6 +905,7 @@ class FrontPage(jp.Div):
                a = container)
         button_container = jp.Div(name = 'button_container', a = container)
         jp.Link(classes = f'{button_classes}', text = 'Run benchmark', href = '/gui', name = 'link', a = button_container)
+        jp.Link(classes = f'{button_classes}', text = 'Play the game', href = '/play', name = 'link', a = button_container)
 
 class MainPage(jp.Div):
     """Main page class containing the GUI components.
@@ -668,6 +940,15 @@ class MainPage(jp.Div):
                                current_player = self.session['current_player'], 
                                state = self.state if self.view_state == None else self.view_state, 
                                a = board_container)
+            #Added by olof
+            elif self.session['view'] == 'human_player':
+                HumanPlayerViewBoard(name = 'board',
+                               session = self.session, 
+                               num_players = self.session['num_players'], 
+                               current_player = self.session['current_player'], 
+                               state = self.state if self.view_state == None else self.view_state, 
+                               a = board_container)
+            #Added by olof/
             Log(classes = 'overflow-auto border-l border-blue-500 px-4 mb-10',
                 name = 'states_log', 
                 label_text = 'Previous moves', 
@@ -714,7 +995,8 @@ def set_session(request):
                                 'current_player': 0, 
                                 'is_running': False, 
                                 'is_paused': False, 
-                                'wait_event': wait_event, 
+                                'wait_event': wait_event,
+                                'human_player': {'move_made' : False, 'human_moves' : [], 'card_clicked' : ''}
                                 }
     return sessions[session_id]
   except Exception as err:
@@ -733,6 +1015,7 @@ def render_main_page(request):
     main_page = MyPage(body_classes = 'bg-gray-900')
 
     session = set_session(request)
+    session['view'] = 'observer'
     event_logger(session, 'button run benchmark')
 
     main_page.session = session
@@ -741,6 +1024,30 @@ def render_main_page(request):
   except Exception as err:
       print('The main page failed to load.')
       print('Exception: {}'.format(err))
+
+#render the main page for human-play
+@jp.SetRoute('/play')
+def render_main_page_play(request):
+  """Renderer for the main page displaying the benchmark.
+     
+     Args: request: A request object.
+
+     Returns: main_page: WebPage for the GUI
+  """
+  try:
+    main_page = MyPage(body_classes = 'bg-gray-900')
+
+    session = set_session(request)
+    session['view'] = 'human_player'
+    event_logger(session, 'button play the game')
+
+    main_page.session = session
+    MainPage(name = 'main_page', session = session, a = main_page)
+    return main_page
+  except Exception as err:
+      print('The main page failed to load.')
+      print('Exception: {}'.format(err))
+
     
 def render_front_page(request):
   """Renderer for the front page.
@@ -773,7 +1080,7 @@ def run_game(game_parameters, session, page):
     """
     try:
         page.delete_components()
-        if state.cur_player() != -1:
+        if (state.cur_player() != -1 and session['view'] == 'observer'): #only observer follows the players as they makes their move
             session['current_player'] = state.cur_player()
         MainPage(name = 'main_page', session = session, state = state, a = page)
         await page.update()
@@ -807,10 +1114,30 @@ def run_game(game_parameters, session, page):
             if session['step_frequency'] > 0:
                 session['wait_event'].wait(timeout=float(session['step_frequency']))
             continue
-        
-        legal_moves = state.legal_moves()
-        move = np.random.choice(legal_moves)
-        state.apply_move(move)
+        #print("Session dict:", session)
+        if session['view'] == 'human_player':
+            if state.cur_player() == 0: #checks the state instead of the session since the session['current_player] should be 0 for human-play
+                while not session['human_player']['move_made']:
+                    time.sleep(1)
+                #apply move
+                for p_move in state.legal_moves():
+                    print('in for loop')
+                    if str(p_move) == str(session['human_player']['human_moves'][0]):
+                        print('applying move')
+                        state.apply_move(p_move)
+                        break
+                #/apply move
+                session['human_player']['move_made'] = not session['human_player']['move_made']
+
+            else:
+                legal_moves = state.legal_moves()
+                move = np.random.choice(legal_moves)
+                state.apply_move(move)
+
+        else:
+            legal_moves = state.legal_moves()
+            move = np.random.choice(legal_moves)
+            state.apply_move(move)
 
         set_current_state(state)        
         asyncio.run(update_page(state, session, page))
