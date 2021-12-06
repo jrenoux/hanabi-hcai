@@ -442,25 +442,23 @@ class HumanControls(jp.Div):
 
             print('Reveal to')
             player_reveal_buttons.show = True
-            
-            
-                    
-            #revealMovesButton = jp.Div(classes = 'grid grid-flow-col items-center text-center h-24', show = False, a = control_container)
-            #for i in 
 
-            
-                
+        control_container = jp.Div(classes = 'grid grid-rows-4 grid-cols-4 items-center text-center h-24', name = 'control_container', a = self)
 
-        control_container = jp.Div(classes = 'flex flex-row items-center text-center h-24', name = 'control_container', a = self)
-        
-        #reveal button to later select player, rank/color to reveal
-        jp.Button(classes = human_button_classes,
-                        text = 'Reveal',
-                        click = revealTo,
-                        name = 'revealTo',
-                        a = control_container)
-        
-        player_reveal_buttons = jp.Div(classes = 'grid grid-rows-2 auto-cols-auto items-center text-center h-24',
+        #if there are moves to reveal show the reveal-button, else only click to play/discard
+        if len(self.legal_moves) > 9:
+            jp.P(classes = f'row-start-1 col-start-1 {label_classes}', text = 'Click card to play/discard or press reveal to reveal to player', name = 'explanation', a = control_container)
+            #reveal button to later select player, rank/color to reveal
+            print(f'Before reveal legalmoves: {self.legal_moves}')
+            jp.Button(classes = f'row-start-3 col-start-1{human_button_classes}',
+                            text = 'Reveal',
+                            click = revealTo,
+                            name = 'revealTo',
+                            a = control_container)
+        else:
+            jp.P(classes = f'row-start-1 col-start-1 {label_classes}', text = 'Click card to play/discard, no hint-tokens left', name = 'explanation', a = control_container)
+
+        player_reveal_buttons = jp.Div(classes = 'row-start-2 col-start-2 grid grid-rows-2 auto-cols-auto gap-2 items-center text-center  h-24',
                         show = False,
                         name = 'player_reveal_buttons',
                         a = control_container)
@@ -468,7 +466,7 @@ class HumanControls(jp.Div):
                         name = 'player_buttons',
                         a = player_reveal_buttons)
         for player in range(self.session['num_players'] - 1):
-            jp.Button(classes = human_button_classes,
+            jp.Button(classes = f'{human_button_classes} h-12',
                         text = f'Player {player + 2}',
                         value = f'player +{player + 1}',
                         name = f'player +{player + 1}',
@@ -504,7 +502,7 @@ class HumanControls(jp.Div):
                         comp.remove_component(comp.get_components()[-1])
                         
          
-                    div_ = jp.Div(classes = 'flex flex-row items-center text-center h-14', name = 'legal_reveals', a = comp)
+                    div_ = jp.Div(classes = 'flex flex-row items-center text-center row-start-2 h-14', name = 'legal_reveals', a = comp)
                     break
             print('Event target value: ', event['target'].value)
             print('Legal moves', self.legal_moves)
@@ -517,12 +515,12 @@ class HumanControls(jp.Div):
                             print('color in the legal move')
                             for letter, color in card_colors_dict.items():
                                 if letter == str(legalMove)[-2]:
-                                    jp.Button(classes = f'{human_button_classes} bg-{color}', text = f'Reveal {color}', value = str(legalMove), click = self.makeMove_reveal, a = div_)
+                                    jp.Button(classes = f'{human_button_classes} h-12', text = f'Reveal {color}', value = str(legalMove), click = self.makeMove_reveal, a = div_)
                                     print(legalMove)
                                     break
                         elif 'rank' in str(legalMove):
                             print('rank in the legal move')
-                            jp.Button(classes = human_button_classes, text = f'Reveal {str(legalMove)[-2]}',value = str(legalMove), click = self.makeMove_reveal, a = div_)
+                            jp.Button(classes = f'{human_button_classes} h-12', text = f'Reveal {str(legalMove)[-2]}',value = str(legalMove), click = self.makeMove_reveal, a = div_)
                             print(legalMove)
             print('legalReveals Done!')
 
@@ -746,7 +744,7 @@ class HumanPlayerViewBoard(jp.Div):
                 self.legal_moves = self.observation.legal_moves()
                 self.index = 0
 
-            container = jp.Div(classes = f'{label_classes} flex flex-col', text = f'Player {self.current_player + 1} observations', name = 'container', a = self)
+            container = jp.Div(classes = f'{label_classes} flex flex-col', name = 'container', a = self)
             game_grid = jp.Div(classes = 'grid grid-cols-5 grid-rows-6', name = 'game_grid', a = container)
             if self.state.cur_player() == 0:
                 HumanControls(classes = 'row-start-0 col-start-0 col-span-5',
