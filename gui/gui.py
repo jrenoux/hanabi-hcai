@@ -16,11 +16,21 @@
 
 from __future__ import print_function
 from os import remove
-from typing import Text
+import os
+import sys
+import glob
+from typing import Text, Tuple
 
 from asyncio.runners import run
 
+parentDirectory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+sys.path.append(parentDirectory)
+
+
+from agents.cross_play_wrappers import agent_wrapper
 from hanabi_learning_environment import pyhanabi
+from hanabi_learning_environment import rl_env
 from game_components import *
 import numpy as np
 import time
@@ -43,8 +53,33 @@ table_positions= {  1: [(2,3)],
                     3: [(3,3), (3,5), (3,1)], 
                     4: [(3,5), (7,5), (7,1), (3,1)], 
                     5: [(2,3), (3,5), (7,5), (7,1), (3,1)]}
+'''
+Template for parent/new directory
+absolutepath = os.path.abspath(__file__)
+print(absolutepath)
+
+fileDirectory = os.path.dirname(absolutepath)
+print(fileDirectory)
+#Path of parent directory
+parentDirectory = os.path.dirname(fileDirectory)
+print(parentDirectory)
+#Navigate to Strings directory
+newPath = os.path.join(parentDirectory, 'agents')   
+print(newPath)
+'''
+
 threads = []
 sessions = {}
+
+def Agents():
+
+    agentPath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agents')   
+
+    modelPaths = str(agentPath) + '/imitator_models/*.save/best.h5'
+
+    agents = glob.glob(modelPaths)
+
+    return agents
 
 class Menu(jp.Div):
     """The menu component.
@@ -100,7 +135,14 @@ class Menu(jp.Div):
             """
             try:
                 event_logger(self.session, "{} for variable {}".format(str(event.input_type), self.session_variable))
-                self.session[self.session_variable] = self.cast_type(self.value)
+                print(self.session)
+                print(self.index)
+                #for selecting a agent with list, needs change!
+                if self.index != None:
+                    self.session[self.session_variable][f'Agent{self.index}'] = self.cast_type(self.value)
+                else:
+                    self.session[self.session_variable] = self.cast_type(self.value)
+
                 with self.session['wait_event']:
                     self.session['wait_event'].notify_all()
             except Exception as err:
@@ -175,6 +217,7 @@ class Menu(jp.Div):
                 self.disabled = False
                 self.session = None
                 self.session_variable = ''
+                self.index = None
                 super().__init__(**kwargs)
             def react(self, data):
                 self.delete_components()
@@ -182,16 +225,22 @@ class Menu(jp.Div):
                 container = jp.Div(classes = 'flex flex-col px-2', name = 'container', a = self)
                 jp.Label(classes = label_classes, text = self.label_text, name = 'label', a = container)
                 select_list = jp.Select(classes = selectlist_classes, 
-                                        value = self.session[self.session_variable],
+                                        #specificaly for the agents to be selected in a list
+                                        value = self.session[self.session_variable] if self.index == None else self.session[self.session_variable][f'Agent{self.index}'],
                                         cast_type = self.cast_type,
                                         session = self.session,
                                         session_variable = self.session_variable,
                                         disabled = self.disabled, 
+                                        index = self.index,
                                         change = session_variable_change, 
                                         name = self.session_variable,
                                         a = container)
-                for option in self.options:
-                    select_list.add(jp.Option(value = option, text = option))
+                if isinstance(self.options, Tuple):
+                    for name, value in self.options:
+                        select_list.add(jp.Option(value = value, text = name))
+                else:
+                    for option in self.options:
+                        select_list.add(jp.Option(value = option, text = option))
 
         menu_container = jp.Div(classes = 'flex justify-between', name = 'menu_container', a = self)
         SelectListItem(label_text = 'Number of players', 
@@ -201,9 +250,9 @@ class Menu(jp.Div):
                        session_variable = 'num_players', 
                        name = 'num_players',
                        disabled = self.session['is_running'], 
+                       change = self.update_page,
                        a = menu_container)
         #the step frequency and view-select only shows if the view isn't human_player
-        print('session', self.session['view'])
         if self.session['view'] != 'human_player':
             SelectListItem(label_text = 'Step frequency', 
                         options = range(0,11),
@@ -212,6 +261,7 @@ class Menu(jp.Div):
                         session_variable = 'step_frequency', 
                         name = 'step_frequency',
                         a = menu_container)
+        #only shows the option to select view if the view isn't human_player
         if self.session['view'] != 'human_player':
             radio_container = jp.Div(classes = 'flex flex-col p-2', name = 'radio_container', a = menu_container)
             RadioItem(label_text = 'Observer view', 
@@ -228,6 +278,17 @@ class Menu(jp.Div):
                     session_variable = 'view',
                     name = 'agent_view', 
                     a = radio_container)
+        #if the view is human_player the list of agents show
+        else:
+            for i in range(self.session['num_players'] - 1):
+                SelectListItem(label_text = f'Agent {i + 1}',
+                                options = Agents(),
+                                cast_type = str,
+                                session = self.session,
+                                session_variable = 'agents',
+                                index = i,
+                                name = f'agent {i}',
+                                a = menu_container)
 
         button_container = jp.Div(classes = 'flex', name = 'button_container', a = menu_container)
         button_visibility = 'visible' if self.session['is_running'] else 'invisible'
@@ -243,6 +304,21 @@ class Menu(jp.Div):
                   click = run_benchmark, 
                   name = 'start_button',
                   a = button_container)
+    async def update_page(self, event):
+        """Pause benchmark and update the GUI based on which state to be viewed.
+
+        Args: state: state of the game.
+                session_id: string, ID of the current session.
+                page: WebPage, the webpage to be updated.
+        """
+        try:
+            event.page.delete_components()
+            MainPage(name = 'main page', session = self.session, a = event.page)
+            await event.page.update()
+        except Exception as err:
+            print('The main page failed to update from the menu.')
+            print("Exception: {}".format(err))
+
         
 class Log(jp.Div):
     """Log component. Serves as either a log for either all the previous moves or previous moves for a certain player.
@@ -428,11 +504,7 @@ class HumanControls(jp.Div):
         self.legal_moves = []
         self.session = None
         super().__init__(**kwargs)
-        '''
-        #changes the button value to the value of the droplist in order to send the right move with make move function
-        def changeMove (self, event):
-            makeMoveButton.value = move_select.value'''
-            
+
         def revealTo(self, event):
             #for each player create a button, when button/player selected get the legal reveals(in other function)
 
@@ -449,7 +521,6 @@ class HumanControls(jp.Div):
         if len(self.legal_moves) > 9:
             jp.P(classes = f'row-start-1 col-start-1 {label_classes}', text = 'Click card to play/discard or press reveal to reveal to player', name = 'explanation', a = control_container)
             #reveal button to later select player, rank/color to reveal
-            print(f'Before reveal legalmoves: {self.legal_moves}')
             jp.Button(classes = f'row-start-3 col-start-1{human_button_classes}',
                             text = 'Reveal',
                             click = revealTo,
@@ -994,12 +1065,14 @@ def set_session(request):
                                 'is_running': False, 
                                 'is_paused': False, 
                                 'wait_event': wait_event,
-                                'human_player': {'move_made' : False, 'human_moves' : [], 'card_clicked' : ''}
+                                'human_player': {'move_made' : False, 'human_moves' : [], 'card_clicked' : ''},
+                                'agents': {'Agent0' : '', 'Agent1' : '', 'Agent2' : '', 'Agent3' : ''}
                                 }
     return sessions[session_id]
   except Exception as err:
       print('Failed to set this clients session variables.')
       print('Exception: {}'.format(err))
+
         
 @jp.SetRoute('/gui')
 def render_main_page(request):
@@ -1067,93 +1140,134 @@ def render_front_page(request):
       print('Exception: {}'.format(err))
 
 def run_game(game_parameters, session, page):
-  """Play a game, selecting random actions."""
+    """Play a game, selecting random actions."""
+    async def update_page(state, session, page):
+        """Update the GUI.
 
-  async def update_page(state, session, page):
-    """Update the GUI.
+        Args: state: HanabiState, State of the game.
+                session: dict, Client's session.
+                page: WebPage, The webpage to be updated.
+        """
+        try:
+            page.delete_components()
+            if (state.cur_player() != -1 and session['view'] == 'observer'): #only observer follows the players as they makes their move
+                session['current_player'] = state.cur_player()
+            MainPage(name = 'main_page', session = session, state = state, a = page)
+            await page.update()
+        except Exception as err:
+            print('The main page failed to update.')
+            print('Exception: {}'.format(err))
 
-       Args: state: HanabiState, State of the game.
-             session: dict, Client's session.
-             page: WebPage, The webpage to be updated.
-    """
-    try:
-        page.delete_components()
-        if (state.cur_player() != -1 and session['view'] == 'observer'): #only observer follows the players as they makes their move
-            session['current_player'] = state.cur_player()
-        MainPage(name = 'main_page', session = session, state = state, a = page)
-        await page.update()
-    except Exception as err:
-        print('The main page failed to update.')
-        print('Exception: {}'.format(err))
+    def set_current_state(state):
+        copied_state = state.copy()
+        session['states'].insert(0, copied_state)
+        session['current_state'] = copied_state
+    
+    def random_player(state):
+        legal_moves = state.legal_moves()
+        move = np.random.choice(legal_moves)
+        state.apply_move(move)
+        return state
 
-  def set_current_state(state):
-      copied_state = state.copy()
-      session['states'].insert(0, copied_state)
-      session['current_state'] = copied_state
-  
-  game = pyhanabi.HanabiGame(game_parameters)
+    #function to wait for human input, using condition.wait_for
+    def wait_human_input():
+        while not session['human_player']['move_made']:
+            time.sleep(1)
+        return True
 
-  print('\nBenchmark started for session: {}\n'.format(session['id']))
-  print(game.parameter_string(), end="")
+    def agent_action_decoder(action):
+        print(f'Agent-decoder action: {action}')
+        actionType = str(action['action_type'])
+        
+        if actionType == 'PLAY':
+            decoded_action = pyhanabi.HanabiMove.get_play_move(action['card_index'])
+        elif actionType == 'DISCARD':
+            decoded_action = pyhanabi.HanabiMove.get_discard_move(action['card_index'])
+        elif actionType == 'REVEAL_RANK':
+            decoded_action = pyhanabi.HanabiMove.get_reveal_rank_move(action['target_offset'], action['rank'])
+        elif actionType == 'REVEAL_COLOR':
+            color = pyhanabi.color_char_to_idx(action['color'])
+            decoded_action = pyhanabi.HanabiMove.get_reveal_color_move(action['target_offset'], color)
+        else:
+            print('Action not avalible')
+            return
+        return decoded_action
+    
+    def human_play(env):
+        state = env.state
+        observation = env._make_observation_all_players()
+        if state.cur_player() == 0: #checks the state instead of the session since the session['current_player] should be 0 for human-play
+                    session['wait_event'].wait_for(wait_human_input)
+                    #apply move
+                    for p_move in state.legal_moves():
+                        print('in for loop')
+                        if str(p_move) == str(session['human_player']['human_moves'][0]):
+                            print('applying move')
+                            state.apply_move(p_move)
+                            break
+                    #/apply move
+                    session['human_player']['move_made'] = not session['human_player']['move_made']
+        else:
+            if session['agents'][f'Agent{state.cur_player() - 1}'] != '': #if there are agents in the agents list this will run otherwise the initial random agent will be run
+                #print(f'Agent-player function: {agent_player(observation, int(state.cur_player()), env)}')
+                action = agent_action_decoder(agent_player(observation, state.cur_player(), env))
+                state.apply_move(action)
+            else:
+                print('random_player')
+                state = random_player(state)
+        return state
+    #hoad code
+    def agent_player(observations, agent_id, env):
+        observation = observations['player_observations'][agent_id]
+        action = agent_wrapper.Agent(session['agents'][f'Agent{agent_id - 1}']).act(observation, env.num_moves())
+        return action[0]
+    #hoad code/
 
-  obs_encoder = pyhanabi.ObservationEncoder(
-      game, enc_type=pyhanabi.ObservationEncoderType.CANONICAL)
-  state = game.new_initial_state()
-  
-  while not state.is_terminal() and session['is_running']:
-    with session['wait_event']:
-        if session['is_paused']:
-            session['wait_event'].wait()
+    env = rl_env.HanabiEnv(game_parameters)
+    '''game = env.game #grabs the game from environment instead of from pyhanabi
+    #game = pyhanabi.HanabiGame(game_parameters)'''
+    observation = env.reset()
 
-        if state.cur_player() == pyhanabi.CHANCE_PLAYER_ID:
-            state.deal_random_card()
-            set_current_state(state)
-            asyncio.run(update_page(state, session, page))
+    print('\nBenchmark started for session: {}\n'.format(session['id']))
+    print(env.game.parameter_string(), end="")
+
+    obs_encoder = env.observation_encoder
+    env.state = env.game.new_initial_state()
+    
+    while not env.state .is_terminal() and session['is_running']:
+        with session['wait_event']:
+            if session['is_paused']:
+                session['wait_event'].wait()
+
+            
+            if env.state .cur_player() == pyhanabi.CHANCE_PLAYER_ID:
+                env.state .deal_random_card()
+                set_current_state(env.state )
+                asyncio.run(update_page(env.state , session, page))
+                if session['step_frequency'] > 0:
+                    session['wait_event'].wait(timeout=float(session['step_frequency']))
+                continue
+            if session['view'] == 'human_player':
+                print(session['agents'])
+                env.state = human_play(env)
+            else:
+                env.state = random_player(env.state)
+            print(env.state.score())
+            set_current_state(env.state)     
+            asyncio.run(update_page(env.state , session, page))
             if session['step_frequency'] > 0:
                 session['wait_event'].wait(timeout=float(session['step_frequency']))
-            continue
-        #print("Session dict:", session)
-        if session['view'] == 'human_player':
-            if state.cur_player() == 0: #checks the state instead of the session since the session['current_player] should be 0 for human-play
-                while not session['human_player']['move_made']:
-                    time.sleep(1)
-                #apply move
-                for p_move in state.legal_moves():
-                    print('in for loop')
-                    if str(p_move) == str(session['human_player']['human_moves'][0]):
-                        print('applying move')
-                        state.apply_move(p_move)
-                        break
-                #/apply move
-                session['human_player']['move_made'] = not session['human_player']['move_made']
-
-            else:
-                legal_moves = state.legal_moves()
-                move = np.random.choice(legal_moves)
-                state.apply_move(move)
-
-        else:
-            legal_moves = state.legal_moves()
-            move = np.random.choice(legal_moves)
-            state.apply_move(move)
-
-        set_current_state(state)        
-        asyncio.run(update_page(state, session, page))
-        if session['step_frequency'] > 0:
-            session['wait_event'].wait(timeout=float(session['step_frequency']))
-
-  session['is_running'] = False
-  asyncio.run(update_page(state, session, page))
-
-  print("Stopping benchmark...")
-  with session['wait_event']:
-    session['wait_event'].wait(timeout=600)
-  print('Benchmark finished.')
+    session['is_running'] = False
+    asyncio.run(update_page(env.state , session, page))
+    print(env.state.score())
+    print("Stopping benchmark...")
+    with session['wait_event']:
+        session['wait_event'].wait(timeout=600)
+    print('Benchmark finished.')
 
 if __name__ == "__main__":
-  # Check that the cdef and library were loaded from the standard paths.
-  assert pyhanabi.cdef_loaded(), "cdef failed to load"
-  assert pyhanabi.lib_loaded(), "lib failed to load"
-
-  jp.justpy(render_front_page)
-  
+    # Check that the cdef and library were loaded from the standard paths.
+    assert pyhanabi.cdef_loaded(), "cdef failed to load"
+    assert pyhanabi.lib_loaded(), "lib failed to load"
+    jp.justpy(render_front_page)
+    
