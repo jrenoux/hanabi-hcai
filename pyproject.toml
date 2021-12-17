@@ -1,2 +1,23 @@
+[tool.poetry]
+name = "hanabi-hcai"
+version = "0.1.0"
+description = "An extension of the Hanabi Learning Environement allowing human users to play the game against artificial agents"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.10"
+setuptools = "^59.6.0"
+wheel = "^0.37.0"
+scikit-build = "^0.12.0"
+cmake = "^3.22.1"
+ninja = "^1.10.2"
+justpy = "^0.2.2"
+tensorflow = "^2.7.0"
+keras = "^2.7.0"
+hanabi-learning-environment = {git = "https://github.com/deepmind/hanabi-learning-environment.git"}
+
+[tool.poetry.dev-dependencies]
+
 [build-system]
-requires = ["setuptools", "wheel", "scikit-build", "cmake", "ninja"]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
