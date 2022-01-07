@@ -1252,7 +1252,8 @@ def run_game(game_parameters, session, page):
     print('\nBenchmark started for session: {}'.format(session['id']))
     print('Playing with:')
     for key, val in session['agents'].items():
-        print(f'{val} located at {get_agent_path(val)}')
+        if(val != ''):
+            print(f'{val} located at {get_agent_path(val)}')
 
     print(env.game.parameter_string(), end="")
     print()
