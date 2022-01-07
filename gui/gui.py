@@ -1042,7 +1042,7 @@ class MyPage(jp.WebPage):
 def event_logger(session, event_string):
     print("{} clicked on {}.".format(session['id'], event_string))
 
-def set_session(request):
+def set_session(request, nb_players=5, agents_list=[]):
   """Sets default session global variables.
      Appends to a sessionlist.
      
@@ -1055,18 +1055,28 @@ def set_session(request):
     if session_id not in sessions:
         wait_event = threading.Condition()
         stop_event = threading.Condition()
+        agents = {}
+        # TODO add a test that the agent list is either empty or as big as number of players - 1
+        assert (agents_list == [] or len(agents_list) == nb_players - 1)
+        for id in range(0, (nb_players - 1)):
+            agent_name = 'Agent' + str(id)
+            if agents_list == []:
+                agents[agent_name] = ''
+            else:
+                agents[agent_name] = agents_list[id]
+
         sessions[session_id] = {'id': session_id,
                                 'current_state': None,
                                 'states': [],
                                 'view': 'observer', 
                                 'step_frequency': 1, 
-                                'num_players': 5, 
+                                'num_players': nb_players,
                                 'current_player': 0, 
                                 'is_running': False, 
                                 'is_paused': False, 
                                 'wait_event': wait_event,
                                 'human_player': {'move_made' : False, 'human_moves' : [], 'card_clicked' : ''},
-                                'agents': {'Agent0' : '', 'Agent1' : '', 'Agent2' : '', 'Agent3' : ''}
+                                'agents': agents
                                 }
     return sessions[session_id]
   except Exception as err:
@@ -1085,7 +1095,7 @@ def render_main_page(request):
   try:
     main_page = MyPage(body_classes = 'bg-gray-900')
 
-    session = set_session(request)
+    session = set_session(request, )
     session['view'] = 'observer'
     event_logger(session, 'button run benchmark')
 
@@ -1105,6 +1115,7 @@ def render_main_page_play(request):
 
      Returns: main_page: WebPage for the GUI
   """
+  print(request)
   try:
     main_page = MyPage(body_classes = 'bg-gray-900')
 
@@ -1265,9 +1276,3 @@ def run_game(game_parameters, session, page):
         session['wait_event'].wait(timeout=600)
     print('Benchmark finished.')
 
-if __name__ == "__main__":
-    # Check that the cdef and library were loaded from the standard paths.
-    assert pyhanabi.cdef_loaded(), "cdef failed to load"
-    assert pyhanabi.lib_loaded(), "lib failed to load"
-    jp.justpy(render_front_page)
-    

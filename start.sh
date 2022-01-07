@@ -1,3 +1,3 @@
 #!/bin/bash
-poetry run python gui/gui.py
+poetry run python gui/launcher.py
 
