@@ -2,7 +2,7 @@ import justpy as jp
 from hanabi_learning_environment import pyhanabi
 
 
-import gui
+import gui.gui as gui
 
 
 if __name__ == "__main__":

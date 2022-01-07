@@ -19,6 +19,7 @@ from os import remove
 import os
 import sys
 import glob
+import re
 from typing import Text, Tuple
 
 from asyncio.runners import run
@@ -31,7 +32,7 @@ sys.path.append(parentDirectory)
 from agents.cross_play_wrappers import agent_wrapper
 from hanabi_learning_environment import pyhanabi
 from hanabi_learning_environment import rl_env
-from game_components import *
+from gui.game_components import *
 import numpy as np
 import time
 import threading
@@ -45,7 +46,7 @@ selectlist_classes = 'w-32 text-xl text-blue-500 text-center font-bold bg-gray-9
 button_classes = 'text-blue-500 font-bold uppercase border border-blue-500 rounded w-48 p-3 ml-2'
 human_button_classes = 'text-blue-500 font-bold uppercase border border-blue-500 rounded max-w-48 p-3 ml-2'
 
-#added card colors dict to be able to match in human controlls
+#added card colors dict to be able to match in human controls
 card_colors_dict = { 'R' : 'red', 'Y' : 'yellow', 'G' : 'green', 'W' : 'white', 'B' : 'blue' }
 card_colors = [ 'red', 'yellow', 'green', 'white', 'blue' ] 
 table_positions= {  1: [(2,3)], 
@@ -70,16 +71,25 @@ print(newPath)
 
 threads = []
 sessions = {}
+g_agents_list = {}
 
-def Agents():
+def AgentsNames():
+    agentPath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agents')
 
-    agentPath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'agents')   
+    folder_names = filter(re.compile(r'(.+)\.save').match, os.listdir(agentPath + "/imitator_models/"))
+    for folder_name in folder_names:
+      agent_name = folder_name.split('.')[0]
+      agent_path = str(agentPath) + '/imitator_models/' + folder_name + '/best.h5'
+      g_agents_list[agent_name] = agent_path
 
-    modelPaths = str(agentPath) + '/imitator_models/*.save/best.h5'
+    #modelPaths = str(agentPath) + '/imitator_models/*.save/best.h5'
 
-    agents = glob.glob(modelPaths)
+    #agentsPath = glob.glob(modelPaths)
 
-    return agents
+    return g_agents_list.keys()
+
+def get_agent_path(name):
+    return g_agents_list[name]
 
 class Menu(jp.Div):
     """The menu component.
@@ -282,7 +292,7 @@ class Menu(jp.Div):
         else:
             for i in range(self.session['num_players'] - 1):
                 SelectListItem(label_text = f'Agent {i + 1}',
-                                options = Agents(),
+                                options = AgentsNames(),
                                 cast_type = str,
                                 session = self.session,
                                 session_variable = 'agents',
@@ -1064,6 +1074,7 @@ def set_session(request, nb_players=5, agents_list=[]):
                 agents[agent_name] = ''
             else:
                 agents[agent_name] = agents_list[id]
+            print(agent_name + " : " + agents[agent_name])
 
         sessions[session_id] = {'id': session_id,
                                 'current_state': None,
@@ -1115,7 +1126,6 @@ def render_main_page_play(request):
 
      Returns: main_page: WebPage for the GUI
   """
-  print(request)
   try:
     main_page = MyPage(body_classes = 'bg-gray-900')
 
@@ -1200,7 +1210,7 @@ def run_game(game_parameters, session, page):
             color = pyhanabi.color_char_to_idx(action['color'])
             decoded_action = pyhanabi.HanabiMove.get_reveal_color_move(action['target_offset'], color)
         else:
-            print('Action not avalible')
+            print('Action not avalaible')
             return
         return decoded_action
     
@@ -1230,7 +1240,7 @@ def run_game(game_parameters, session, page):
     #hoad code
     def agent_player(observations, agent_id, env):
         observation = observations['player_observations'][agent_id]
-        action = agent_wrapper.Agent(session['agents'][f'Agent{agent_id - 1}']).act(observation, env.num_moves())
+        action = agent_wrapper.Agent(get_agent_path(session['agents'][f'Agent{agent_id - 1}'])).act(observation, env.num_moves())
         return action[0]
     #hoad code/
 
@@ -1239,8 +1249,13 @@ def run_game(game_parameters, session, page):
     #game = pyhanabi.HanabiGame(game_parameters)'''
     observation = env.reset()
 
-    print('\nBenchmark started for session: {}\n'.format(session['id']))
+    print('\nBenchmark started for session: {}'.format(session['id']))
+    print('Playing with:')
+    for key, val in session['agents'].items():
+        print(f'{val} located at {get_agent_path(val)}')
+
     print(env.game.parameter_string(), end="")
+    print()
 
     obs_encoder = env.observation_encoder
     env.state = env.game.new_initial_state()
