@@ -5,8 +5,9 @@ description = "An extension of the Hanabi Learning Environement allowing human u
 authors = ["Your Name <you@example.com>"]
 
 [tool.poetry.dependencies]
-python = "3.7.*"
-setuptools = "45"
+python = "3.8.*"
+setuptools = "57.5.0"
+demjson = "2.2.4"
 wheel = "^0.37.0"
 scikit-build = "^0.12.0"
 cmake = "^3.22.1"
@@ -19,5 +20,5 @@ hanabi-learning-environment = {git = "https://github.com/deepmind/hanabi-learnin
 [tool.poetry.dev-dependencies]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core<=1.0.4"]
 build-backend = "poetry.core.masonry.api"
