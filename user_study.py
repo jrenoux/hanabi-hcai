@@ -11,6 +11,7 @@ agents_list = ['rainbow',
                'quux-valuebot']
 protocol_step = 0
 
+# TODO add a window with the score
 
 def start_protocol(request):
   try:

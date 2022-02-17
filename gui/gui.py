@@ -48,11 +48,11 @@ human_button_classes = 'text-blue-500 font-bold uppercase border border-blue-500
 
 #added card colors dict to be able to match in human controls
 card_colors_dict = { 'R' : 'red', 'Y' : 'yellow', 'G' : 'green', 'W' : 'white', 'B' : 'blue' }
-card_colors = [ 'red', 'yellow', 'green', 'white', 'blue' ] 
-table_positions= {  1: [(2,3)], 
-                    2: [(3,5), (3,1)], 
-                    3: [(3,3), (3,5), (3,1)], 
-                    4: [(3,5), (7,5), (7,1), (3,1)], 
+card_colors = [ 'red', 'yellow', 'green', 'white', 'blue' ]
+table_positions= {  1: [(2,3)],
+                    2: [(3,5), (3,1)],
+                    3: [(3,3), (3,5), (3,1)],
+                    4: [(3,5), (7,5), (7,1), (3,1)],
                     5: [(2,3), (3,5), (7,5), (7,1), (3,1)]}
 '''
 Template for parent/new directory
@@ -116,11 +116,11 @@ class Menu(jp.Div):
                 self.text = 'Stop'
                 try:
                     self.session['states'].clear()
-                    benchmark_thread = threading.Thread(target = run_game, 
-                                                        args = ({"players": self.session['num_players'], "random_start_player": True}, 
-                                                                self.session, 
-                                                                event.page), 
-                                                        name = self.session['id'], 
+                    benchmark_thread = threading.Thread(target = run_game,
+                                                        args = ({"players": self.session['num_players'], "random_start_player": True},
+                                                                self.session,
+                                                                event.page),
+                                                        name = self.session['id'],
                                                         daemon = True)
                     threads.append(benchmark_thread)
                     benchmark_thread.start()
@@ -132,13 +132,13 @@ class Menu(jp.Div):
                 self.session['is_running'] = False
                 self.session['is_paused'] = False
                 self.text = 'Run'
-                
+
                 with self.session['wait_event']:
                     self.session['wait_event'].notify_all()
 
         def session_variable_change(self, event):
             """OnChange event handler. Wakes up sleeping threads for instant change.
-               
+
                Args: self.session: dict, Access to the session global variables.
                      self.session_variable: A variable in the session dict.
                      self.cast_type: datatype, used for casting.
@@ -162,7 +162,7 @@ class Menu(jp.Div):
         def pause_benchmark(self, event):
             """Pause the benchmark by setting is_paused variable, used in a conditional semaphore.
                Sets the text of the button accordingly.
-               
+
                Args: session: dict, Access to the session global variables.
             """
             try:
@@ -178,7 +178,7 @@ class Menu(jp.Div):
                 print('Exception: {}'.format(err))
 
         class RadioItem(jp.Div):
-            """A radio button component. 
+            """A radio button component.
                Used for different views.
 
                Params: label_text: string, Lead text for the label.
@@ -205,7 +205,7 @@ class Menu(jp.Div):
                          session = self.session,
                          session_variable = self.session_variable,
                          checked = True if self.session[self.session_variable] == self.item_value else False,
-                         change = session_variable_change, 
+                         change = session_variable_change,
                          a = container)
                 jp.Label(classes = f'{label_classes} ml-1', text = self.label_text, name = 'label', a = container)
 
@@ -218,7 +218,7 @@ class Menu(jp.Div):
                        options: list, Options to add to the select list.
                        disabled: bool, Disables the use of the select list if True.
                        session: dict, Access to the session global variables.
-                       session_variable: A variable in the session dict. 
+                       session_variable: A variable in the session dict.
             """
             def __init__(self, **kwargs):
                 self.label_text = ''
@@ -234,15 +234,15 @@ class Menu(jp.Div):
 
                 container = jp.Div(classes = 'flex flex-col px-2', name = 'container', a = self)
                 jp.Label(classes = label_classes, text = self.label_text, name = 'label', a = container)
-                select_list = jp.Select(classes = selectlist_classes, 
+                select_list = jp.Select(classes = selectlist_classes,
                                         #specificaly for the agents to be selected in a list
                                         value = self.session[self.session_variable] if self.index == None else self.session[self.session_variable][f'Agent{self.index}'],
                                         cast_type = self.cast_type,
                                         session = self.session,
                                         session_variable = self.session_variable,
-                                        disabled = self.disabled, 
+                                        disabled = self.disabled,
                                         index = self.index,
-                                        change = session_variable_change, 
+                                        change = session_variable_change,
                                         name = self.session_variable,
                                         a = container)
                 if isinstance(self.options, Tuple):
@@ -253,40 +253,40 @@ class Menu(jp.Div):
                         select_list.add(jp.Option(value = option, text = option))
 
         menu_container = jp.Div(classes = 'flex justify-between', name = 'menu_container', a = self)
-        SelectListItem(label_text = 'Number of players', 
+        SelectListItem(label_text = 'Number of players',
                        options = range(2,6),
                        cast_type = int,
                        session = self.session,
-                       session_variable = 'num_players', 
+                       session_variable = 'num_players',
                        name = 'num_players',
-                       disabled = self.session['is_running'], 
+                       disabled = self.session['is_running'],
                        change = self.update_page,
                        a = menu_container)
         #the step frequency and view-select only shows if the view isn't human_player
         if self.session['view'] != 'human_player':
-            SelectListItem(label_text = 'Step frequency', 
+            SelectListItem(label_text = 'Step frequency',
                         options = range(0,11),
                         cast_type = int,
                         session = self.session,
-                        session_variable = 'step_frequency', 
+                        session_variable = 'step_frequency',
                         name = 'step_frequency',
                         a = menu_container)
         #only shows the option to select view if the view isn't human_player
         if self.session['view'] != 'human_player':
             radio_container = jp.Div(classes = 'flex flex-col p-2', name = 'radio_container', a = menu_container)
-            RadioItem(label_text = 'Observer view', 
+            RadioItem(label_text = 'Observer view',
                     item_value = 'observer',
                     cast_type = str,
                     session = self.session,
                     session_variable = 'view',
-                    name = 'observer_view', 
+                    name = 'observer_view',
                     a = radio_container)
-            RadioItem(label_text = 'Agent view', 
+            RadioItem(label_text = 'Agent view',
                     cast_type = str,
                     item_value = 'agent',
                     session = self.session,
                     session_variable = 'view',
-                    name = 'agent_view', 
+                    name = 'agent_view',
                     a = radio_container)
         #if the view is human_player the list of agents show
         else:
@@ -302,16 +302,16 @@ class Menu(jp.Div):
 
         button_container = jp.Div(classes = 'flex', name = 'button_container', a = menu_container)
         button_visibility = 'visible' if self.session['is_running'] else 'invisible'
-        jp.Button(classes = f'{button_classes} {button_visibility}', 
-                  text = f'Pause' if not self.session['is_paused'] else 'Resume', 
+        jp.Button(classes = f'{button_classes} {button_visibility}',
+                  text = f'Pause' if not self.session['is_paused'] else 'Resume',
                   session = self.session,
                   click = pause_benchmark,
-                  name = 'pause_button', 
+                  name = 'pause_button',
                   a = button_container)
-        jp.Button(classes = button_classes, 
-                  text = f'Run' if not self.session['is_running'] else 'Stop', 
+        jp.Button(classes = button_classes,
+                  text = f'Run' if not self.session['is_running'] else 'Stop',
                   session = self.session,
-                  click = run_benchmark, 
+                  click = run_benchmark,
                   name = 'start_button',
                   a = button_container)
     async def update_page(self, event):
@@ -329,7 +329,7 @@ class Menu(jp.Div):
             print('The main page failed to update from the menu.')
             print("Exception: {}".format(err))
 
-        
+
 class Log(jp.Div):
     """Log component. Serves as either a log for either all the previous moves or previous moves for a certain player.
 
@@ -362,7 +362,7 @@ class Log(jp.Div):
             self.session = None
             self.view_state = None
             super().__init__(**kwargs)
-            
+
             self.num_players = self.session['num_players']
             self.current_player = self.session['current_player']
 
@@ -391,16 +391,16 @@ class Log(jp.Div):
                 self.lead_text = f'Player {self.player + 1} revealed color'
                 self.card_color = card_colors[self.item.move().color()]
                 self.card_text = f'{self.card_color}'
-                self.end_text = f'to player {self.revealed_player + 1}' 
+                self.end_text = f'to player {self.revealed_player + 1}'
             elif self.item.move().type() == 4:
                 self.lead_text = f'Player {self.player + 1} revealed'
                 self.card_color = 'white'
                 self.card_text = f'rank {self.item.move().rank() + 1}'
-                self.end_text = f'to player {self.revealed_player + 1}' 
+                self.end_text = f'to player {self.revealed_player + 1}'
             elif self.item.move().type() == 5:
                 self.lead_text = f'Dealt'
-                '''The following lines below will show the color 
-                   and rank if the player is NOT marked in agent-play 
+                '''The following lines below will show the color
+                   and rank if the player is NOT marked in agent-play
                    or NOT the human-player in human-play
                 '''
                 self.card_color = 'gray' if (self.session['current_player'] == self.dealt_player and self.session['view'] == 'human_player' or self.session['view'] == 'agent') else card_colors[self.item.move().color()]
@@ -410,7 +410,7 @@ class Log(jp.Div):
                 self.log_title = 'No such log item.'
 
             color = self.card_color if self.card_color == 'white' else self.card_color + '-500'
-            
+
             item_div = jp.Button(classes = f'{label_classes} flex flex-row items-center', click = self.update_page, name = 'item_div', a = container)
             item_button = jp.Img(classes = 'mb-1 mr-1', src = '/static/gui/img/visibility.png', a = item_div)
             jp.Span(classes = 'mr-1 mb-1', text = f'{self.lead_text}', name = 'lead_text_span', a = item_div)
@@ -435,7 +435,7 @@ class Log(jp.Div):
             except Exception as err:
                 print('The main page failed to update from the log.')
                 print("Exception: {}".format(err))
-                
+
 class LegalMoves(jp.Div):
     def __init__(self, **kwargs):
         self.label_text = ''
@@ -1183,7 +1183,7 @@ def run_game(game_parameters, session, page):
         copied_state = state.copy()
         session['states'].insert(0, copied_state)
         session['current_state'] = copied_state
-    
+
     def random_player(state):
         legal_moves = state.legal_moves()
         move = np.random.choice(legal_moves)
@@ -1199,7 +1199,7 @@ def run_game(game_parameters, session, page):
     def agent_action_decoder(action):
         print(f'Agent-decoder action: {action}')
         actionType = str(action['action_type'])
-        
+
         if actionType == 'PLAY':
             decoded_action = pyhanabi.HanabiMove.get_play_move(action['card_index'])
         elif actionType == 'DISCARD':
@@ -1213,7 +1213,7 @@ def run_game(game_parameters, session, page):
             print('Action not avalaible')
             return
         return decoded_action
-    
+
     def human_play(env):
         state = env.state
         observation = env._make_observation_all_players()
@@ -1260,13 +1260,13 @@ def run_game(game_parameters, session, page):
 
     obs_encoder = env.observation_encoder
     env.state = env.game.new_initial_state()
-    
+
     while not env.state .is_terminal() and session['is_running']:
         with session['wait_event']:
             if session['is_paused']:
                 session['wait_event'].wait()
 
-            
+
             if env.state .cur_player() == pyhanabi.CHANCE_PLAYER_ID:
                 env.state .deal_random_card()
                 set_current_state(env.state )
@@ -1279,8 +1279,8 @@ def run_game(game_parameters, session, page):
                 env.state = human_play(env)
             else:
                 env.state = random_player(env.state)
-            print(env.state.score())
-            set_current_state(env.state)     
+            print(f"score: {env.state.score()}")
+            set_current_state(env.state)
             asyncio.run(update_page(env.state , session, page))
             if session['step_frequency'] > 0:
                 session['wait_event'].wait(timeout=float(session['step_frequency']))
