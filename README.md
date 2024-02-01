@@ -1,6 +1,8 @@
-This is not an officially supported Google product.
+This project is cloned from the Hanabi Learning Environment, published by DeepMind. 
+It creates a graphical user interface for humans to play against artificial agents. 
 
-hanabi\_learning\_environment is a research platform for Hanabi experiments. The file rl\_env.py provides an RL environment using an API similar to OpenAI Gym. A lower level game interface is provided in pyhanabi.py for non-RL methods like Monte Carlo tree search.
+It makes used of Poetry for the python dependency manager, and expect python 3.11 or higher (note that it can probably 
+be run with another version of python but this would require to change the dependencies in `pyproject.toml`)
 
 ### Getting started
 Install the learning environment:
@@ -9,13 +11,18 @@ sudo apt-get install g++            # if you don't already have a CXX compiler
 sudo apt-get install python-pip     # if you don't already have pip
 pip install .                       # or pip install git+repo_url to install directly from github
 ```
-Run the examples:
+Install Poetry by following the instruction available at https://python-poetry.org/
+
+Install the dependencies by running
 ```
-pip install numpy                   # game_example.py uses numpy
-python examples/rl_env_example.py   # Runs RL episodes
-python examples/game_example.py     # Plays a game using the lower level interface
+poetry update
 ```
-Run the GUI:
+in the main directory. 
+
+Run the GUI with 
+
 ```
-pip install justpy                  # gui.py uses justpy
-python gui/gui.py                   # Runs game_example.py with a gui
+poetry run python3 gui/gui.py
+```
+
+

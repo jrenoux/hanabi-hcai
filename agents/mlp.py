@@ -8,7 +8,7 @@ from tensorflow.keras.layers import Dense, Embedding, Input, Flatten, Dropout
 from tensorflow.keras.layers import BatchNormalization, LeakyReLU, ELU, Softmax
 from tensorflow.keras.layers import PReLU
 from tensorflow.keras.activations import sigmoid, tanh
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers.legacy import Adam
 from tensorflow.keras.regularizers import l2
 
 # suppress TF warnings
