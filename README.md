@@ -25,4 +25,6 @@ Run the GUI with
 poetry run python3 gui/gui.py
 ```
 
-
+### Known Issues
+ - The GUI does not detect or indicate when the game is lost
+ - To start a new game, the gui.py must be stopped and started again

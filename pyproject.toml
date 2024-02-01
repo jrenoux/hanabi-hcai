@@ -14,8 +14,6 @@ justpy = "*"
 tensorflow = "2.15"
 keras = "*"
 
-
-
 hanabi-learning-environment = {git = "https://github.com/deepmind/hanabi-learning-environment.git"}
 
 [tool.poetry.dev-dependencies]
